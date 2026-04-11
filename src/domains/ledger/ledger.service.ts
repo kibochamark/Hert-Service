@@ -21,10 +21,16 @@ export class LedgerService {
     async executeTransfer(dto: LedgerTransactionDto) {
         return await this.prisma.$transaction(async (tx) => {
             // 0. Fetch account types to determine mathematical direction
+
+            console.log(`Executing ledger transfer: Debit ${dto.amount} to account ${dto.debitAccountId}, Credit ${dto.amount} from account ${dto.creditAccountId} for company ${dto.companyId} by user ${dto.userId}`);
+
+
             const [debitAcc, creditAcc] = await Promise.all([
                 tx.memberAccount.findUnique({ where: { id: dto.debitAccountId } }),
                 tx.memberAccount.findUnique({ where: { id: dto.creditAccountId } }),
             ]);
+
+            console.log(`Fetched debit account: ${debitAcc?.id} (type: ${debitAcc?.type}), credit account: ${creditAcc?.id} (type: ${creditAcc?.type}) for ledger transfer with reference ID: ${dto.referenceId}`);
 
             if (!debitAcc || !creditAcc) {
                 throw new BadRequestException('One or both accounts not found');

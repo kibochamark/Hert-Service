@@ -110,7 +110,7 @@ export class ContributionRepository {
                 // money moves from equity to company contribution pool (liability) and then to member account (asset)
                 // fetch the above accoounts
 
-                const [companyContributionPoolAccount, memberAccount] = await Promise.all([
+                const [companyContributionPoolAccount, existingMemberAccount] = await Promise.all([
                     tx.memberAccount.findFirst({
                         where: {
                             companyId: updatedContribution.companyId,
@@ -124,7 +124,24 @@ export class ContributionRepository {
                             type: AccountType.MEMBER_EQUITY
                         },
                     }),
-                ]); 
+                ]);
+
+                this.logger.log(`Fetched company contribution pool account: ${companyContributionPoolAccount?.id} and member equity account: ${existingMemberAccount?.id} for contribution approval with ID: ${contributionId}`);
+
+                const memberAccount = existingMemberAccount ?? await tx.memberAccount.create({
+                    data: {
+                        name: 'Member Equity Account',
+                        type: AccountType.MEMBER_EQUITY,
+                        companyId: updatedContribution.companyId,
+                        userId: updatedContribution.userId,
+                    },
+                });
+
+                this.logger.log(
+                    existingMemberAccount
+                        ? `Found member equity account: ${memberAccount.id}`
+                        : `Created member equity account: ${memberAccount.id} for user: ${updatedContribution.userId}`
+                );
 
                 await this.ledgerService.executeTransfer({
                     debitAccountId: companyContributionPoolAccount?.id as string, // This should be the actual account ID for the company's contribution pool

@@ -24,6 +24,10 @@ export class UsersRepository {
                     }
                 });
 
+
+                console.log(`Creating user with email: ${userData.email} in company: ${userData.companyId}`);
+  
+
                 // ADD AUDIT LOG
                 await tx.auditLog.create({
                     data: {
