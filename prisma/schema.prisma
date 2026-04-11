@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Company {
+  id                   String                @id @default(uuid())
+  name                 String
+  description          String?
+  fiscalYearStartMonth DateTime?
+
+  monthlyContributionDeadline Int               @default(15)
+  minimumMonthlyContribution Decimal           @default(3000.00)
+  
+  createdAt            DateTime              @default(now())
+  auditLogs            AuditLog[]
+  contributionRequests ContributionRequest[]
+  investments          Investment[]
+  accounts             MemberAccount[]
+  User                 User[]
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean?
+  image         String?
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  companyId     String
+  targetMonthlyContribution Decimal               @default(3000.00)
+  auditLogs                 AuditLog[]
+  contributionRequests      ContributionRequest[]
+  memberAccount             MemberAccount?
+  role          String?
+  account       account[]
+  session       session[]
+
+  @@map("user")
+  companies Company[]
+}
+
+model MemberAccount {
+  id            String        @id @default(uuid())
+  name          String
+  type          AccountType
+  balance       Decimal       @default(0.00)
+  companyId     String
+  userId        String?       @unique
+  creditEntries LedgerEntry[] @relation("CreditAccount")
+  debitEntries  LedgerEntry[] @relation("DebitAccount")
+  company       Company       @relation(fields: [companyId], references: [id])
+  user          User?  @relation(fields: [userId], references: [id])
+}
+
+model LedgerEntry {
+  id              String        @id @default(uuid())
+  amount          Decimal
+  description     String
+  transactionDate DateTime      @default(now())
+  debitAccountId  String
+  creditAccountId String
+  referenceId     String?
+  metadata        Json?
+  creditAccount   MemberAccount @relation("CreditAccount", fields: [creditAccountId], references: [id])
+  debitAccount    MemberAccount @relation("DebitAccount", fields: [debitAccountId], references: [id])
+}
+
+model Investment {
+  id           String           @id @default(uuid())
+  name         String
+  category     AssetCategory
+  principal    Decimal
+  status       InvestmentStatus @default(ACTIVE)
+  purchaseDate DateTime
+  companyId    String
+  company      Company          @relation(fields: [companyId], references: [id])
+  returns      ReturnRecord[]
+}
+
+model ReturnRecord {
+  id           String     @id @default(uuid())
+  amount       Decimal
+  dateReceived DateTime   @default(now())
+  investmentId String
+  investment   Investment @relation(fields: [investmentId], references: [id])
+}
+
+model AuditLog {
+  id          String       @id @default(uuid())
+  userId      String?
+  action      AuditAction
+  entityName  String
+  entityId    String
+  oldValue    Json?
+  newValue    Json?
+  ipAddress   String?
+  userAgent   String?
+  description String?
+  createdAt   DateTime     @default(now())
+  companyId   String
+  company     Company      @relation(fields: [companyId], references: [id])
+  user        User? @relation(fields: [userId], references: [id])
+
+  @@index([entityName, entityId])
+}
+
+model ContributionRequest {
+  id               String         @id @default(uuid())
+  amount           Decimal
+  transactionRef   String         @unique
+  evidenceUrl      String?
+  evidencePublicId String?
+  status           ApprovalStatus @default(PENDING)
+  userId           String
+  companyId        String
+  adminNotes       String?
+  processedAt      DateTime?
+  processedBy      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  company          Company        @relation(fields: [companyId], references: [id])
+  user             User    @relation(fields: [userId], references: [id])
+
+  @@index([status])
+}
+
+
+
+model account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(6)
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @db.Timestamptz(6)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId])
+}
+
+model session {
+  id        String   @id
+  expiresAt DateTime @db.Timestamptz(6)
+  token     String   @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @db.Timestamptz(6)
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId])
+}
+
+model verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([identifier])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum AccountType {
+  MEMBER_EQUITY
+  ASSET
+  INVESTMENT
+  EXPENSE
+  REVENUE
+}
+
+enum AssetCategory {
+  BOND
+  SHARES
+  IPO
+  REAL_ESTATE
+}
+
+enum InvestmentStatus {
+  ACTIVE
+  MATURED
+  LIQUIDATED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT_DATA
+  ACCESS_DENIED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
