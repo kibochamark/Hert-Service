@@ -194,6 +194,8 @@ enum AssetCategory {
   SHARES
   IPO
   REAL_ESTATE
+  NSE_EQUITY
+  OTHER
 }
 
 enum InvestmentStatus {
