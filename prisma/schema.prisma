@@ -37,7 +37,7 @@ model User {
   auditLogs                 AuditLog[]
   contributionRequests      ContributionRequest[]
   memberAccount             MemberAccount?
-  role          String?
+  role          Role
   account       account[]
   session       session[]
 

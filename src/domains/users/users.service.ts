@@ -41,4 +41,8 @@ export class UsersService {
         // Add any business logic here before calling the repository
         return this.userRepository.createMemberAccountForUser(userId, companyId);
     }
+
+    async getMemberAccountByUserId(userId: string) {
+        return this.userRepository.getMemberAccountByUserId(userId);
+    }
 }

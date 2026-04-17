@@ -197,6 +197,58 @@ export class ContributionRepository {
         }
     }
 
+    async getMemberSummaryByCompany(companyId: string) {
+        try {
+            this.logger.log(`Fetching member contribution summary for company: ${companyId}`);
+
+            const users = await this.prisma.user.findMany({
+                where: { companyId },
+                include: {
+                    memberAccount: { select: { balance: true } },
+                    contributionRequests: {
+                        where: { companyId },
+                        select: { status: true, createdAt: true },
+                    },
+                },
+            });
+
+            // Total of all MEMBER_EQUITY balances for equity % calculation
+            const companyTotal = users.reduce(
+                (sum, u) => sum + (u.memberAccount?.balance.toNumber() ?? 0),
+                0,
+            );
+
+            const summary = users.map(user => {
+                const balance = user.memberAccount?.balance.toNumber() ?? 0;
+                const approved = user.contributionRequests.filter(c => c.status === ApprovalStatus.APPROVED);
+                const pending = user.contributionRequests.filter(c => c.status === ApprovalStatus.PENDING);
+                const lastApproved = approved.sort(
+                    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                )[0];
+
+                return {
+                    userId: user.id,
+                    name: user.name,
+                    email: user.email,
+                    targetMonthlyContribution: user.targetMonthlyContribution.toNumber(),
+                    totalContributed: balance,
+                    approvedContributions: approved.length,
+                    pendingContributions: pending.length,
+                    lastContributionDate: lastApproved?.createdAt ?? null,
+                    equityPercentage: companyTotal > 0
+                        ? parseFloat(((balance / companyTotal) * 100).toFixed(2))
+                        : 0,
+                };
+            });
+
+            this.logger.log(`Member summary built for ${users.length} members in company: ${companyId}`);
+            return summary;
+        } catch (error) {
+            this.logger.error(`Error fetching member summary for company: ${companyId}`, error);
+            throw error;
+        }
+    }
+
     async deleteContribution(contributionId: string) {
         try {
             this.logger.log(`Deleting contribution with ID: ${contributionId}`);

@@ -14,12 +14,12 @@ export class InvestmentController {
 
   @Post()
   async createInvestment(@Body() createInvestmentDto: CreateInvestmentDto, @Req() req: Request) {
-    const companyId = (req.user as any).companyId;
+    const {userId, companyId} = (req.user as any);
     return this.investmentService.createInvestment({
       ...createInvestmentDto,
       purchaseDate: new Date(createInvestmentDto.purchaseDate), // Convert string to Date
       company: { connect: { id: companyId } }, // Connect to company
-    });
+    }, userId);
   }
 
   @Get()

@@ -1,8 +1,8 @@
-import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
-import { FinancialTransactionsService } from '../financial-transactions.service';
-import { LogRevenueDto, LogExpenseDto } from '../../../common/validators/financial-transactions.validators';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { Roles } from '../../../common/decorators/roles.decorator';
+import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import { FinancialTransactionsService } from '../domains/financial-transactions/financial-transactions.service';
+import { LogRevenueDto, LogExpenseDto } from '../common/validators/financial-transactions.validators';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from 'generated/prisma/client';
 import { Request } from 'express';
 
@@ -38,5 +38,23 @@ export class FinancialTransactionsController {
       companyId,
       userId,
     );
+  }
+
+  @Get('revenue')
+  async getRevenue(@Req() req: Request) {
+    const companyId = (req.user as any).companyId;
+    return this.financialTransactionsService.getRevenue(companyId);
+  }
+
+  @Get('expenses')
+  async getExpenses(@Req() req: Request) {
+    const companyId = (req.user as any).companyId;
+    return this.financialTransactionsService.getExpenses(companyId);
+  }
+
+  @Get('balance')
+  async getCompanyBalance(@Req() req: Request) {
+    const companyId = (req.user as any).companyId;
+    return this.financialTransactionsService.getCompanyBalance(companyId);
   }
 }

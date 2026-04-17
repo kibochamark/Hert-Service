@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { FinancialTransactionsRepository } from './financial-transactions.repository';
 import { AccountType } from 'generated/prisma/enums';
 import { LedgerService } from '../../domains/ledger/ledger.service';
-import { PrismaService } from '../../prisma/prisma.service'; // To query for COMPANY_CASH account
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class FinancialTransactionsService {
@@ -11,10 +11,29 @@ export class FinancialTransactionsService {
   constructor(
     private readonly financialTransactionsRepository: FinancialTransactionsRepository,
     private readonly ledgerService: LedgerService,
-    private readonly prisma: PrismaService, // Inject PrismaService to find COMPANY_CASH account
+    private readonly prisma: PrismaService,
   ) {}
 
-  async logRevenue(data: { amount: number; dateReceived: Date; investmentId: string }, companyId: string, userId: string) {
+  private async getOrCreateAccount(companyId: string, type: AccountType, name: string) {
+    let account = await this.prisma.memberAccount.findFirst({
+      where: { companyId, type },
+    });
+
+    if (!account) {
+      account = await this.prisma.memberAccount.create({
+        data: { name, type, companyId },
+      });
+      this.logger.log(`Created ${type} account: ${account.id} for company: ${companyId}`);
+    }
+
+    return account;
+  }
+
+  async logRevenue(
+    data: { amount: number; dateReceived: Date; investmentId: string },
+    companyId: string,
+    userId: string,
+  ) {
     try {
       this.logger.log(`Logging revenue of ${data.amount} for company ${companyId}`);
 
@@ -25,79 +44,87 @@ export class FinancialTransactionsService {
         investment: { connect: { id: data.investmentId } },
       });
 
-      // 2. Find COMPANY_CASH account for the company
-      const companyCashAccount = await this.prisma.memberAccount.findFirst({
-        where: {
-          companyId: companyId,
-          type: AccountType.ASSET,
-          name: 'Main Cash Wallet', // Assuming 'Main Cash Wallet' is the COMPANY_CASH account
-        },
+      // 2. Find required accounts
+      const assetAccount = await this.prisma.memberAccount.findFirst({
+        where: { companyId, type: AccountType.ASSET },
       });
 
-      if (!companyCashAccount) {
-        throw new Error(`COMPANY_CASH account not found for company ID: ${companyId}`);
+      if (!assetAccount) {
+        throw new Error(`ASSET account not found for company: ${companyId}`);
       }
 
-      // 3. Move money into COMPANY_CASH account using LedgerService
-      // This assumes revenue increases an asset account (COMPANY_CASH) and decreases a revenue account (or increases equity)
-      // For simplicity, I'll assume it increases COMPANY_CASH (debit) and credits a generic REVENUE account or directly impacts equity.
-      // For now, I'll just debit COMPANY_CASH and credit a placeholder.
-      // A more robust implementation would involve a specific revenue account.
+      const revenueAccount = await this.getOrCreateAccount(companyId, AccountType.REVENUE, 'Revenue Account');
+
+      // 3. Transfer: debit ASSET (cash comes in), credit REVENUE
+      // Revenue increases when credited; ASSET increases when debited
       await this.ledgerService.executeTransfer({
-        debitAccountId: companyCashAccount.id,
-        creditAccountId: 'REVENUE_ACCOUNT_PLACEHOLDER_ID', // This needs to be a real account ID
+        debitAccountId: assetAccount.id,
+        creditAccountId: revenueAccount.id,
         amount: data.amount,
-        description: `Revenue from investment return (ID: ${returnRecord.id})`,
-        companyId: companyId,
-        userId: userId,
+        description: `Investment return received (ReturnRecord: ${returnRecord.id})`,
+        userId,
+        companyId,
         referenceId: returnRecord.id,
       });
 
-      this.logger.log(`Revenue logged and moved to COMPANY_CASH for company ${companyId}`);
+      this.logger.log(`Revenue logged for company ${companyId}, ReturnRecord: ${returnRecord.id}`);
       return returnRecord;
     } catch (error) {
-      this.logger.error(`Error logging revenue: ${error.message}`);
+      this.logger.error(`Error logging revenue: ${(error as Error).message}`);
       throw error;
     }
   }
 
-  async logExpense(data: { amount: number; description: string; transactionDate: Date }, companyId: string, userId: string) {
+  async logExpense(
+    data: { amount: number; description: string; transactionDate: Date },
+    companyId: string,
+    userId: string,
+  ) {
     try {
       this.logger.log(`Logging expense of ${data.amount} for company ${companyId}`);
 
-      // 1. Find COMPANY_CASH account for the company
-      const companyCashAccount = await this.prisma.memberAccount.findFirst({
-        where: {
-          companyId: companyId,
-          type: AccountType.ASSET,
-          name: 'Main Cash Wallet', // Assuming 'Main Cash Wallet' is the COMPANY_CASH account
-        },
+      // 1. Find required accounts
+      const assetAccount = await this.prisma.memberAccount.findFirst({
+        where: { companyId, type: AccountType.ASSET },
       });
 
-      if (!companyCashAccount) {
-        throw new Error(`COMPANY_CASH account not found for company ID: ${companyId}`);
+      if (!assetAccount) {
+        throw new Error(`ASSET account not found for company: ${companyId}`);
       }
 
-      // 2. Move money out of COMPANY_CASH account using LedgerService
-      // This assumes expense decreases an asset account (COMPANY_CASH) and debits an expense account.
-      // For now, I'll just credit COMPANY_CASH and debit a placeholder.
-      // A more robust implementation would involve a specific expense account.
-      await this.ledgerService.executeTransfer({
-        debitAccountId: 'EXPENSE_ACCOUNT_PLACEHOLDER_ID', // This needs to be a real account ID
-        creditAccountId: companyCashAccount.id,
+      const expenseAccount = await this.getOrCreateAccount(companyId, AccountType.EXPENSE, 'Expense Account');
+
+      // 2. Transfer: debit EXPENSE (expense increases), credit ASSET (cash goes out)
+      const ledgerEntry = await this.ledgerService.executeTransfer({
+        debitAccountId: expenseAccount.id,
+        creditAccountId: assetAccount.id,
         amount: data.amount,
         description: data.description,
-        companyId: companyId,
-        userId: userId,
-        // referenceId: ... // If there's an expense record, its ID would go here
+        userId,
+        companyId,
       });
 
-      this.logger.log(`Expense logged and moved from COMPANY_CASH for company ${companyId}`);
-      // No explicit expense record in DB, so just return success or the ledger entry if available
-      return { success: true, message: 'Expense logged successfully' };
+      this.logger.log(`Expense logged for company ${companyId}`);
+      return ledgerEntry;
     } catch (error) {
-      this.logger.error(`Error logging expense: ${error.message}`);
+      this.logger.error(`Error logging expense: ${(error as Error).message}`);
       throw error;
     }
+  }
+
+  async getRevenue(companyId: string) {
+    return this.financialTransactionsRepository.findReturnRecordsByCompany(companyId);
+  }
+
+  async getExpenses(companyId: string) {
+    return this.financialTransactionsRepository.findExpensesByCompany(companyId);
+  }
+
+  async getCompanyBalance(companyId: string) {
+    return this.financialTransactionsRepository.getCompanyBalance(companyId);
+  }
+
+  async getPortfolioSummary(companyId: string) {
+    return this.financialTransactionsRepository.getPortfolioSummary(companyId);
   }
 }

@@ -1,16 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { InvestmentStatus, Prisma } from 'generated/prisma/client';
-import { AuditAction } from 'generated/prisma/enums'; // Import AuditAction
+import { AccountType, AuditAction } from 'generated/prisma/enums';
+import { LedgerService } from '../ledger/ledger.service';
 
 
 @Injectable()
 export class InvestmentRepository {
   private logger = new Logger(InvestmentRepository.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledgerService: LedgerService,
+  ) {}
 
-  async createInvestment(data: Prisma.InvestmentCreateInput) {
+  async createInvestment(data: Prisma.InvestmentCreateInput, userId: string) {
     try {
       this.logger.log(`Creating investment: ${data.name}`);
       const investment = await this.prisma.investment.create({ data });
@@ -23,6 +27,42 @@ export class InvestmentRepository {
           newValue: JSON.stringify(investment),
           companyId: investment.companyId,
         },
+      });
+
+      // Find company ASSET account (source of funds)
+      const assetAccount = await this.prisma.memberAccount.findFirst({
+        where: { companyId: investment.companyId, type: AccountType.ASSET },
+      });
+
+      if (!assetAccount) {
+        throw new Error(`ASSET account not found for company: ${investment.companyId}`);
+      }
+
+      // Find or create company INVESTMENT account (destination)
+      let investmentAccount = await this.prisma.memberAccount.findFirst({
+        where: { companyId: investment.companyId, type: AccountType.INVESTMENT },
+      });
+
+      if (!investmentAccount) {
+        investmentAccount = await this.prisma.memberAccount.create({
+          data: {
+            name: 'Investment Pool',
+            type: AccountType.INVESTMENT,
+            companyId: investment.companyId,
+          },
+        });
+        this.logger.log(`Created INVESTMENT account: ${investmentAccount.id} for company: ${investment.companyId}`);
+      }
+
+      // Transfer: ASSET → INVESTMENT (cash leaves, capital deployed)
+      await this.ledgerService.executeTransfer({
+        debitAccountId: investmentAccount.id,
+        creditAccountId: assetAccount.id,
+        amount: investment.principal.toNumber(),
+        description: `Capital deployed for investment: ${investment.name}`,
+        userId,
+        companyId: investment.companyId,
+        referenceId: investment.id,
       });
 
       this.logger.log(`Investment created successfully with ID: ${investment.id}`);

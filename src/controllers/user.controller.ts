@@ -58,4 +58,10 @@ export class UserController {
   ) {
     return this.userService.createMemberAccountForUser(userId, companyId);
   }
+
+  @Roles(Role.ADMIN, Role.MEMBER)
+  @Get(':userId/member-account')
+  async getMemberAccount(@Param('userId') userId: string) {
+    return this.userService.getMemberAccountByUserId(userId);
+  }
 }

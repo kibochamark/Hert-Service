@@ -4,7 +4,6 @@ import { CreateContributionDto, ApproveContributionDto, UpdateContributionDto, C
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from 'generated/prisma/client';
-import { Request } from 'express'; // Import Request for type hinting
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @UseGuards(RolesGuard)
@@ -77,5 +76,11 @@ export class ContributionController {
   @Delete(':contributionId')
   async deleteContribution(@Param() params: ContributionIdParam) {
     return this.contributionService.deleteContribution(params.contributionId);
+  }
+
+  @Roles(Role.ADMIN)
+  @Get('company/:companyId/member-summary')
+  async getMemberSummary(@Param('companyId') companyId: string) {
+    return this.contributionService.getMemberSummaryByCompany(companyId);
   }
 }

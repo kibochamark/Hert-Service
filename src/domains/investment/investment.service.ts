@@ -7,8 +7,8 @@ import { InvestmentStatus, Prisma } from 'generated/prisma/client';
 export class InvestmentService {
   constructor(private readonly investmentRepository: InvestmentRepository) {}
 
-  async createInvestment(data: Prisma.InvestmentCreateInput) {
-    return this.investmentRepository.createInvestment(data);
+  async createInvestment(data: Prisma.InvestmentCreateInput, userId: string) {
+    return this.investmentRepository.createInvestment(data, userId);
   }
 
   async findAllInvestments() {

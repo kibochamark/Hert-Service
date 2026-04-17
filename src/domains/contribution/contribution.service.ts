@@ -1,5 +1,5 @@
+/// <reference types="multer" />
 import { Injectable, Logger } from '@nestjs/common';
-import e from 'express';
 import { ContributionRepository } from './contribution.repository';
 import { ApprovalStatus } from 'generated/prisma/browser';
 import { S3Service } from 'src/globalservices/s3/s3.service';
@@ -23,7 +23,7 @@ export class ContributionService {
         private readonly s3Service: S3Service
     ) {}
 
-    async createContribution(contributionData:ContributionData, file?: Express.Multer.File) {
+    async createContribution(contributionData: ContributionData, file?: Express.Multer.File) {
         try{
             if (file) {
                 this.logger.log(`Uploading file for contribution with transactionRef: ${contributionData.transactionRef}`);
@@ -81,6 +81,10 @@ export class ContributionService {
     }) {
         this.logger.log(`Approving contribution with ID: ${contributionId} by user: ${data.processedBy}`);
         return this.contributionRepository.approveContribution(contributionId, data);
+    }
 
+    async getMemberSummaryByCompany(companyId: string) {
+        this.logger.log(`Fetching member summary for company: ${companyId}`);
+        return this.contributionRepository.getMemberSummaryByCompany(companyId);
     }
 }

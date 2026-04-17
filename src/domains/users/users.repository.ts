@@ -169,4 +169,49 @@ export class UsersRepository {
         }
     }
 
+    async getMemberAccountByUserId(userId: string) {
+        try {
+            this.logger.log(`Fetching member account for user ID: ${userId}`);
+
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                include: { memberAccount: true },
+            });
+
+            if (!user) {
+                this.logger.warn(`User with ID: ${userId} not found`);
+                return null;
+            }
+
+            // Sum all MEMBER_EQUITY balances in the company to compute equity %
+            const allMemberAccounts = await this.prisma.memberAccount.findMany({
+                where: { companyId: user.companyId, type: AccountType.MEMBER_EQUITY },
+                select: { balance: true },
+            });
+
+            const companyTotalContributed = allMemberAccounts.reduce(
+                (sum, a) => sum + a.balance.toNumber(),
+                0,
+            );
+            const memberBalance = user.memberAccount?.balance.toNumber() ?? 0;
+            const equityPercentage =
+                companyTotalContributed > 0
+                    ? parseFloat(((memberBalance / companyTotalContributed) * 100).toFixed(2))
+                    : 0;
+
+            this.logger.log(`Member account fetched for user ID: ${userId}`);
+            return {
+                userId: user.id,
+                equityPercentage,
+                totalContributed: memberBalance,
+                targetMonthlyContribution: user.targetMonthlyContribution.toNumber(),
+                joinedAt: user.createdAt,
+                companyId: user.companyId,
+            };
+        } catch (error) {
+            this.logger.error(`Error fetching member account for user ID: ${userId}`, error);
+            throw error;
+        }
+    }
+
 }
