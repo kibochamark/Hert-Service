@@ -23,7 +23,7 @@ export async function getAuth() {
         plugins: [bearer(), admin()],
         user: {
             additionalFields: {
-                role:     { type: "string", required: true, defaultValue: "STAFF" },
+                role:     { type: "string", required: true, defaultValue: "MEMBER" },
                 companyId: { type: "string", required: true },
             },
         },

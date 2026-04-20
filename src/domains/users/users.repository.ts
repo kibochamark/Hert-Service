@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { role } from "better-auth/plugins";
 import { AccountType } from "generated/prisma/browser";
 import { UserData } from "src/common/types/company.types";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -20,7 +21,8 @@ export class UsersRepository {
                         name: userData.name,
                         email: userData.email,
                         // password: userData.password,
-                        companyId: userData.companyId
+                        companyId: userData.companyId,
+                        role:  "MEMBER",
                     }
                 });
 
