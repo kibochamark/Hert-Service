@@ -16,11 +16,10 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
-          port: ${{ secrets.VPS_PORT }}
           script: |
             set -e
 
-            cd /path/to/hert-service
+            cd /apps/hert-service/Hert-service
 
             # Pull latest code from main
             git pull origin main
