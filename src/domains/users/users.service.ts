@@ -5,11 +5,22 @@ import { CreateUserDto } from 'src/common/validators/user.validators';
 
 @Injectable()
 export class UsersService {
-    constructor(private readonly userRepository: UsersRepository) { }
+    constructor(private readonly userRepository: UsersRepository,
+
+    ) { }
 
     async createUser(data: CreateUserDto) {
         // Add any business logic here before calling the repository
-        return this.userRepository.createUser(data);
+    
+        const created_user = await this.userRepository.createUser(data);
+
+        if (!created_user) {
+            throw new Error('Failed to create user');
+        }
+
+        const account = await this.userRepository.createMemberAccountForUser(created_user.id, data.companyId);
+
+        return { ...created_user, account };
     }
 
     async findAllUsers() {

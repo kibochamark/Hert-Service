@@ -16,7 +16,7 @@ export class FinancialTransactionsRepository {
       const returnRecord = await this.prisma.returnRecord.create({ data });
       this.logger.log(`Return record created successfully with ID: ${returnRecord.id}`);
       return returnRecord;
-    } catch (error) {
+    } catch (error:any) {
       this.logger.error(`Error creating return record: ${error.message}`);
       throw error;
     }

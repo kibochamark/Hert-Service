@@ -1,0 +1,34 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH into VPS and deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            cd /path/to/hert-service
+
+            # Pull latest code from main
+            git pull origin main
+
+            # Rebuild and restart containers
+            docker compose down
+            docker compose up --build -d
+
+            # Remove unused images and build cache to free disk space
+            docker image prune -af
+            docker builder prune -af
