@@ -54,7 +54,7 @@ model MemberAccount {
   userId        String?       @unique
   creditEntries LedgerEntry[] @relation("CreditAccount")
   debitEntries  LedgerEntry[] @relation("DebitAccount")
-  company       Company       @relation(fields: [companyId], references: [id])
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user          User?  @relation(fields: [userId], references: [id])
 }
 
@@ -79,7 +79,7 @@ model Investment {
   status       InvestmentStatus @default(ACTIVE)
   purchaseDate DateTime
   companyId    String
-  company      Company          @relation(fields: [companyId], references: [id])
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   returns      ReturnRecord[]
 }
 
@@ -88,7 +88,7 @@ model ReturnRecord {
   amount       Decimal
   dateReceived DateTime   @default(now())
   investmentId String
-  investment   Investment @relation(fields: [investmentId], references: [id])
+  investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -124,8 +124,8 @@ model ContributionRequest {
   processedBy      String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  company          Company        @relation(fields: [companyId], references: [id])
-  user             User    @relation(fields: [userId], references: [id])
+  company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade  )
 
   @@index([status])
 }
@@ -212,6 +212,7 @@ enum AuditAction {
   LOGOUT
   EXPORT_DATA
   ACCESS_DENIED
+  REVERSE_TRANSACTION
 }
 
 enum ApprovalStatus {

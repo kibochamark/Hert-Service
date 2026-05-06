@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
 import { FinancialTransactionsService } from '../domains/financial-transactions/financial-transactions.service';
-import { LogRevenueDto, LogExpenseDto } from '../common/validators/financial-transactions.validators';
+import { LogRevenueDto, LogExpenseDto, DepositDto } from '../common/validators/financial-transactions.validators';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from 'generated/prisma/client';
@@ -50,6 +50,13 @@ export class FinancialTransactionsController {
   async getExpenses(@Req() req: Request) {
     const companyId = (req.user as any).companyId;
     return this.financialTransactionsService.getExpenses(companyId);
+  }
+
+  @Post('deposit')
+  async deposit(@Body() depositDto: DepositDto, @Req() req: Request) {
+    const companyId = (req.user as any).companyId;
+    const userId = (req.user as any).id;
+    return this.financialTransactionsService.deposit(depositDto, companyId, userId);
   }
 
   @Get('balance')

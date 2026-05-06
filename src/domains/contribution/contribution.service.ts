@@ -38,8 +38,8 @@ export class ContributionService {
             this.logger.log(`Creating contribution with transactionRef: ${contributionData.transactionRef} for user: ${contributionData.userId} in company: ${contributionData.companyId}`);
             return this.contributionRepository.createContribution(contributionData);
         
-        }catch(error){ 
-            this.logger.error(`Error creating contribution with transactionRef: ${contributionData.transactionRef} for user: ${contributionData.userId} in company: ${contributionData.companyId}`, error.stack);
+        }catch(error:any){ 
+            this.logger.error(`Error creating contribution with transactionRef: ${contributionData.transactionRef} for user: ${contributionData.userId} in company: ${contributionData.companyId}`, error?.message);
             await this.s3Service.deleteFile(contributionData.evidencePublicId!);
             throw error;
 

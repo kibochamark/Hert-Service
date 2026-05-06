@@ -13,7 +13,59 @@ export class FinancialTransactionsRepository {
   async createReturnRecord(data: Prisma.ReturnRecordCreateInput) {
     try {
       this.logger.log(`Creating return record for investment ID: ${data?.investment?.connect?.id as string} with amount: ${data.amount}`);
-      const returnRecord = await this.prisma.returnRecord.create({ data });
+
+      // const returnRecord = await this.prisma.returnRecord.create({ data });
+      const returnRecord = await this.prisma.$transaction(async (tx) => {
+        const createdRecord = await tx.returnRecord.create({ data, select:{
+          id: true, amount: true,
+          dateReceived: true,
+          investment: {
+            select: {
+              id: true,
+              companyId: true,
+            }
+          }
+        } });
+
+        // Find company ASSET account (destination of funds)
+        const assetAccount = await tx.memberAccount.findFirst({
+          where: { companyId: createdRecord.investment.companyId, type: AccountType.ASSET },
+        });
+
+        if (!assetAccount) {
+          throw new Error(`ASSET account not found for company: ${createdRecord.investment.companyId}`);
+        }
+
+        // Find or create company INVESTMENT account (source)
+        let investmentAccount = await tx.memberAccount.findFirst({
+          where: { companyId: createdRecord.investment.companyId, type: AccountType.INVESTMENT },
+        });
+
+        if (!investmentAccount) {
+          investmentAccount = await tx.memberAccount.create({
+            data: {
+              name: 'Investment Pool',
+              type: AccountType.INVESTMENT,
+              companyId: createdRecord.investment.companyId,
+            },
+          });
+          this.logger.log(`Created INVESTMENT account: ${investmentAccount.id} for company: ${createdRecord.investment.companyId}`);
+        }
+
+        // Transfer: INVESTMENT → ASSET (cash returns to company)
+        await tx.ledgerEntry.create({
+          data: {
+            debitAccountId: assetAccount.id,
+            creditAccountId: investmentAccount.id,
+            amount: createdRecord.amount,
+            description: `Return for Investment ID: ${createdRecord.investment.id}`,
+            transactionDate: createdRecord.dateReceived,
+            referenceId: createdRecord.id,
+          },
+        });
+
+        return createdRecord;
+      })
       this.logger.log(`Return record created successfully with ID: ${returnRecord.id}`);
       return returnRecord;
     } catch (error:any) {

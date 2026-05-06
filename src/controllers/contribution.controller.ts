@@ -72,7 +72,7 @@ export class ContributionController {
     return this.contributionService.updateContribution(params.contributionId, updateContributionDto);
   }
 
-  @Roles(Role.ADMIN) // Only Admin can delete contributions
+  @Roles(Role.ADMIN, Role.MEMBER) // Only Admin can delete contributions
   @Delete(':contributionId')
   async deleteContribution(@Param() params: ContributionIdParam) {
     return this.contributionService.deleteContribution(params.contributionId);

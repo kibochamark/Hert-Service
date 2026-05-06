@@ -27,3 +27,13 @@ export class LogExpenseDto {
   @IsNotEmpty()
   transactionDate: string; // Use string for DTO, convert to Date in service/controller
 }
+
+export class DepositDto {
+  @IsNumber()
+  @IsNotEmpty()
+  amount: number;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+}

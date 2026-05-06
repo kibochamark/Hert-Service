@@ -63,6 +63,14 @@ export class ContributionRepository {
         this.logger.log(`Fetching contributions for user: ${userId}`);
         const contributions = await this.prisma.contributionRequest.findMany({
             where: { userId },
+            include: {
+                user: {
+                    select: {
+                        name: true,
+                        email: true,
+                    }
+                }
+            }
         });
         this.logger.log(`Found ${contributions.length} contributions for user: ${userId}`);
         return contributions;
@@ -77,6 +85,14 @@ export class ContributionRepository {
         this.logger.log(`Fetching contributions for company: ${companyId}`);
         const contributions = await this.prisma.contributionRequest.findMany({
             where: { companyId },
+            include: {
+                user: {
+                    select: {
+                        name: true,
+                        email: true,
+                    }
+                }
+            }
         });
         this.logger.log(`Found ${contributions.length} contributions for company: ${companyId}`);
         return contributions;
@@ -171,6 +187,14 @@ export class ContributionRepository {
             this.logger.log(`Fetching contribution with ID: ${contributionId}`);
             const contribution = await this.prisma.contributionRequest.findUnique({
                 where: { id: contributionId },
+                include:{
+                    user:{
+                        select:{
+                            name: true,
+                            email: true,
+                        }
+                    }
+                }
             });
             if (!contribution) {
                 this.logger.warn(`Contribution with ID: ${contributionId} not found`);
@@ -252,6 +276,60 @@ export class ContributionRepository {
     async deleteContribution(contributionId: string) {
         try {
             this.logger.log(`Deleting contribution with ID: ${contributionId}`);
+            // 1. we need to undo any ledger transactions if the contribution was approved
+            const contribution = await this.prisma.contributionRequest.findUnique({
+                where: { id: contributionId },
+            });
+
+            if (!contribution) {
+                this.logger.warn(`Contribution with ID: ${contributionId} not found for deletion`);
+                return null;
+            }
+
+            if (contribution.status === ApprovalStatus.APPROVED) {
+                // Fetch the ledger transaction related to this contribution
+                const ledgerTransaction = await this.prisma.ledgerEntry.findFirst({
+                    where: { referenceId: contributionId },
+                });
+                if (ledgerTransaction) {
+                    await this.prisma.$transaction(async (tx) => { 
+                        // Reverse the ledger transaction
+                        await this.ledgerService.executeTransfer({
+                            debitAccountId: ledgerTransaction.creditAccountId, // Reverse the accounts
+                            creditAccountId: ledgerTransaction.debitAccountId,
+                            amount: ledgerTransaction.amount.toNumber(),
+                            description: `Reversal of contribution with transactionRef: ${contribution.transactionRef} due to deletion`,
+                            userId: contribution.userId,
+                            companyId: contribution.companyId,
+                            referenceId: `reversal-${contribution.id}-${Date.now()}`,
+                        });
+
+                        await tx.auditLog.create({
+                            data: {
+                                action: "REVERSE_TRANSACTION",
+                                entityName: 'LedgerEntry',
+                                entityId: ledgerTransaction.id,
+                                newValue: JSON.stringify({
+                                    debitAccountId: ledgerTransaction.creditAccountId,
+                                    creditAccountId: ledgerTransaction.debitAccountId,
+                                    amount: ledgerTransaction.amount.toNumber(),
+                                    description: `Reversal of contribution with transactionRef: ${contribution.transactionRef} due to deletion`,
+                                    userId: contribution.userId,
+                                    companyId: contribution.companyId,
+                                    referenceId: `reversal-${contribution.id}-${Date.now()}`,
+                                }),
+                                companyId: contribution.companyId
+                            }
+                        });
+                        
+                    })
+                    
+                    this.logger.log(`Reversed ledger transaction for contribution with ID: ${contributionId}`);
+                } else {
+                    this.logger.warn(`No ledger transaction found to reverse for contribution with ID: ${contributionId}`);
+                }
+            }
+            // 2. Delete the contribution request   
             await this.prisma.contributionRequest.delete({ where: { id: contributionId } });
             this.logger.log(`Successfully deleted contribution with ID: ${contributionId}`);
         } catch (error) {
