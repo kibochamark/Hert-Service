@@ -3,7 +3,7 @@ FROM node:22-alpine AS builder
 WORKDIR /usr/src/app
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
@@ -30,7 +30,7 @@ FROM node:22-alpine AS production
 WORKDIR /usr/src/app
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
