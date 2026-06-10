@@ -7,6 +7,7 @@ RUN npm install -g pnpm
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
+RUN pnpm config set ignore-scripts false
 RUN pnpm install
 
 # Copy source code
@@ -34,7 +35,7 @@ RUN npm install -g pnpm
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-
+RUN pnpm config set ignore-scripts false
 # Install production dependencies ONLY (no dev dependencies)
 RUN pnpm install --prod
 
