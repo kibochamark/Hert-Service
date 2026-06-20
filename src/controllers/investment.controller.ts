@@ -6,8 +6,10 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Prisma, Role } from 'generated/prisma/client';
 import { Request } from 'express';
 
-@UseGuards(RolesGuard)
-@Roles(Role.ADMIN) // All routes in this controller require ADMIN role
+
+// All routes in this controller require ADMIN role
+@UseGuards(RolesGuard) 
+@Roles(`ADMIN`, `MEMBER`) // Both ADMIN and MEMBER can access investment routes
 @Controller('investment')
 export class InvestmentController {
   constructor(private readonly investmentService: InvestmentService) {}
@@ -22,11 +24,15 @@ export class InvestmentController {
     }, userId);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles("ADMIN", "MEMBER") // Both ADMIN and MEMBER can view investments
   @Get()
   async findAllInvestments() {
+    console.log("Fetching all investments");
     return this.investmentService.findAllInvestments();
   }
 
+  @Roles(Role.ADMIN, Role.MEMBER) // Both ADMIN and MEMBER can view investments
   @Get(':investmentId')
   async findInvestmentById(@Param() params: InvestmentIdParam) {
     return this.investmentService.findInvestmentById(params.investmentId);
@@ -52,7 +58,7 @@ export class InvestmentController {
     return this.investmentService.updateInvestmentStatus(params.investmentId, updateInvestmentStatusDto.status);
   }
 
-  @Delete(':investmentId')
+  @Delete(':investmentId')  
   async deleteInvestment(@Param() params: InvestmentIdParam) {
     return this.investmentService.deleteInvestment(params.investmentId);
   }

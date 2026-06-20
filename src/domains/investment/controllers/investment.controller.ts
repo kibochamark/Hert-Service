@@ -7,12 +7,13 @@ import { InvestmentStatus, Prisma, Role } from 'generated/prisma/client';
 import { Request } from 'express';
 
 @UseGuards(RolesGuard)
-@Roles(Role.ADMIN) // All routes in this controller require ADMIN role
+ // All routes in this controller require ADMIN role
 @Controller('investment')
 export class InvestmentController {
   constructor(private readonly investmentService: InvestmentService) {}
 
   @Post()
+  @Roles(Role.ADMIN)
   async createInvestment(@Body() createInvestmentDto: CreateInvestmentDto, @Req() req: Request) {
     const companyId = (req.user as any).companyId;
     const userId = (req.user as any).id;
@@ -27,16 +28,19 @@ export class InvestmentController {
   }
 
   @Get()
+  @Roles(Role.ADMIN, Role.MEMBER) // Both ADMIN and MEMBER can view investments
   async findAllInvestments() {
     return this.investmentService.findAllInvestments();
   }
 
   @Get(':investmentId')
+  @Roles(Role.ADMIN, Role.MEMBER) // Both ADMIN and MEMBER can view investments
   async findInvestmentById(@Param() params: InvestmentIdParam) {
     return this.investmentService.findInvestmentById(params.investmentId);
   }
 
   @Put(':investmentId')
+  @Roles(Role.ADMIN) // Both ADMIN and MEMBER can update investments
   async updateInvestment(
     @Param() params: InvestmentIdParam,
     @Body() updateInvestmentDto: UpdateInvestmentDto,
@@ -49,6 +53,7 @@ export class InvestmentController {
   }
 
   @Patch(':investmentId/status')
+  @Roles(Role.ADMIN) // Only ADMIN can update investment status
   async updateInvestmentStatus(
     @Param() params: InvestmentIdParam,
     @Body() updateInvestmentStatusDto: Partial<UpdateInvestmentStatusDto>,
@@ -57,6 +62,7 @@ export class InvestmentController {
   }
 
   @Delete(':investmentId')
+  @Roles(Role.ADMIN) // Only ADMIN can delete investments
   async deleteInvestment(@Param() params: InvestmentIdParam) {
     return this.investmentService.deleteInvestment(params.investmentId);
   }
