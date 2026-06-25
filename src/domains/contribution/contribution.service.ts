@@ -3,6 +3,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ContributionRepository } from './contribution.repository';
 import { ApprovalStatus } from 'generated/prisma/browser';
 import { S3Service } from 'src/globalservices/s3/s3.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+
 
 export interface ContributionData {
     evidenceUrl?: string;
@@ -20,7 +23,8 @@ export interface ContributionData {
 export class ContributionService {
     private readonly logger = new Logger(ContributionService.name);
     constructor(private readonly contributionRepository: ContributionRepository,
-        private readonly s3Service: S3Service
+        private readonly s3Service: S3Service,
+        @InjectQueue('process-contribution') private  processContribution: Queue
     ) {}
 
     async createContribution(contributionData: ContributionData, file?: Express.Multer.File) {
@@ -86,5 +90,14 @@ export class ContributionService {
     async getMemberSummaryByCompany(companyId: string) {
         this.logger.log(`Fetching member summary for company: ${companyId}`);
         return this.contributionRepository.getMemberSummaryByCompany(companyId);
+    }
+
+
+    async processContributionCallback(contributionData: ContributionData) {
+        this.logger.log(`Processing contribution callback for transactionRef: ${contributionData.transactionRef}`);
+        // send this to a queue using a job producer
+
+        await this.processContribution.add('process-contribution-job', 
+            contributionData, {});
     }
 }

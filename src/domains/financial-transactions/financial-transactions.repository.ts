@@ -2,13 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from 'generated/prisma/client';
 import { AccountType } from 'generated/prisma/enums';
+import { ConfigService } from '@nestjs/config';
 
 
 @Injectable()
 export class FinancialTransactionsRepository {
   private logger = new Logger(FinancialTransactionsRepository.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly config: ConfigService ) {}
 
   async createReturnRecord(data: Prisma.ReturnRecordCreateInput) {
     try {
@@ -171,6 +172,91 @@ export class FinancialTransactionsRepository {
       return summary;
     } catch (error) {
       this.logger.error(`Error fetching balance for company: ${companyId}`, error);
+      throw error;
+    }
+  }
+
+  // initiate a payment request for a contribution or investment return, which will be processed by the finance team
+  async initiatePaymentRequest(companyId: string, amount: number, description: string, userId: string, phone: string) {
+    try {
+      this.logger.log(`Initiating payment request for company: ${companyId}, amount: ${amount}, description: ${description}`);
+      // verify user exists
+      const isexisting = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!isexisting) {
+        throw new Error(`User with ID ${userId} does not exist`);
+      }
+
+      const provider_token_url= this.config.get('PAYMENT_PROVIDER_TOKEN_URL');
+      const provider_payment_url= this.config.get('PAYMENT_PROVIDER_URL');
+
+      // console.log(`Using payment provider token URL: ${provider_token_url}`);
+
+      // get auth token from payment [rovider]
+      const authToken = await fetch(`${provider_token_url}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: this.config.get('PAYMENT_PROVIDER_API_KEY'), email: this.config.get('BUSINESS_EMAIL') }),
+      }).then(res => res.json()).then(data => data?.data?.token);
+
+      // console.log(`Obtained auth token from payment provider: ${authToken}`);
+
+      if (!authToken) {
+        throw new Error('Failed to obtain auth token from payment provider');
+      }
+
+      // initiate payment request in our system
+      const [response] = await this.prisma.$transaction(async (tx) => {
+        const paymentRequest= await fetch(`${provider_payment_url}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({
+             amount:amount,
+             phone: phone,
+             callback_url: this.config.get('PAYMENT_CALLBACK_URL'),
+            description: JSON.stringify({
+              companyId,
+              userId,
+              description,
+            }),
+            }),
+        }).then(res => res.json());
+
+        // console.log(`Payment provider response:`, paymentRequest);
+
+
+
+        if (!paymentRequest || !paymentRequest.success) {
+          throw new Error('Failed to initiate payment request with payment provider');
+        }
+
+        await tx.transactionsTracker.create({
+          data: {
+            transactionId:`${userId}-${amount}-${Date.now()}`,
+            checkoutRequestId: paymentRequest?.data?.checkout_request_id,
+            metadata:{
+              companyId,
+              userId,
+              description,
+              phone,
+              merchantRequestId: paymentRequest?.data?.merchant_request_id,
+              checkoutRequestId: paymentRequest?.data?.checkout_request_id,
+            }
+          },
+        });
+
+        
+
+        return [paymentRequest?.data];
+
+      });
+
+      this.logger.log(`Payment request initiated successfully for user: ${userId}`);
+      return response;
+    } catch (error) {
+      this.logger.error(`Error initiating payment request for user: ${userId}`, error);
       throw error;
     }
   }

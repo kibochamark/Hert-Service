@@ -131,6 +131,24 @@ model ContributionRequest {
 }
 
 
+model TransactionsTracker {
+  id            String    @id @default(uuid())
+  transactionId String    @unique
+  checkoutRequestId String @unique
+  createdAt     DateTime  @default(now())
+  metadata      Json?
+  status        TransactionStatus @default(PENDING)
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+  CANCELLED
+}
+
+
 
 model account {
   id                    String    @id

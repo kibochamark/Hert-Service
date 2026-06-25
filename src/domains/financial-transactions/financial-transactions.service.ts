@@ -216,4 +216,16 @@ export class FinancialTransactionsService {
   async getPortfolioSummary(companyId: string) {
     return this.financialTransactionsRepository.getPortfolioSummary(companyId);
   }
+
+
+  async initiatePaymentRequest( paymentinfo:{
+    companyId: string,
+    amount: number,
+    description: string,
+    userId: string,
+    phone: string
+  }
+  ) {
+    return this.financialTransactionsRepository.initiatePaymentRequest(paymentinfo.companyId, paymentinfo.amount, paymentinfo.description, paymentinfo.userId, paymentinfo.phone);
+  }
 }

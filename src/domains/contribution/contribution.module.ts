@@ -6,9 +6,17 @@ import { LedgerModule } from '../ledger/ledger.module';
 import { ContributionController } from 'src/controllers/contribution.controller';
 import { S3Service } from 'src/globalservices/s3/s3.service';
 import { S3Module } from 'src/globalservices/s3/s3.module';
+import { FinancialTransactionsModule } from '../financial-transactions/financial-transactions.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
-  imports: [PrismaModule, LedgerModule, S3Module],
+  imports: [
+    
+    BullModule.registerQueue({
+      name: 'process-contribution',
+    }),
+    
+    PrismaModule, LedgerModule, S3Module, FinancialTransactionsModule],
   providers: [ContributionService, ContributionRepository],
   controllers:[ContributionController],
   exports: [ContributionService, ContributionRepository] // Export ContributionService and ContributionRepository if they're used by other modules

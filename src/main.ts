@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -9,7 +9,10 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
     transform: true,
   }))
-  app.setGlobalPrefix('api/v1/');
+  app.enableVersioning({
+    type: VersioningType.URI,
+    prefix: 'api/v',
+  });
   await app.listen(process.env.PORT ?? 4000);
 }
 bootstrap();

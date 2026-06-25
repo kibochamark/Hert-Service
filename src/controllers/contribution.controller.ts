@@ -1,15 +1,16 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Req, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Req, UseInterceptors, UploadedFile, Version } from '@nestjs/common';
 import { ContributionService } from '../domains/contribution/contribution.service';
-import { CreateContributionDto, ApproveContributionDto, UpdateContributionDto, ContributionIdParam } from '../common/validators/contribution.validators';
+import { CreateContributionDto, ApproveContributionDto, UpdateContributionDto, ContributionIdParam, CreateContributionDtoV2 } from '../common/validators/contribution.validators';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from 'generated/prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { FinancialTransactionsService } from 'src/domains/financial-transactions/financial-transactions.service';
 
 @UseGuards(RolesGuard)
 @Controller('contribution')
 export class ContributionController {
-  constructor(private readonly contributionService: ContributionService) {}
+  constructor(private readonly contributionService: ContributionService, private readonly financialTransactionsService: FinancialTransactionsService) {}
 
   @Roles(Role.MEMBER, Role.ADMIN) // Members can create their own contributions
   @Post()
@@ -18,10 +19,6 @@ export class ContributionController {
     const userId = (req.user as any).id;
     const companyId = (req.user as any).companyId;
 
-
-
-
-    console.log(`Creating contribution for user ${userId} in company ${companyId} with data:`, createContributionDto);
     return this.contributionService.createContribution({
       ...createContributionDto,
       amount: parseFloat(createContributionDto.amount), // Ensure amount is a number
@@ -30,6 +27,35 @@ export class ContributionController {
       
     }, file);
   }
+
+
+  @Roles(Role.MEMBER, Role.ADMIN) // Members can create their own contributions
+  @Version('2')
+  @Post()
+  async createContributionV2(@Body() createContributionDto: CreateContributionDtoV2, @Req() req: any, @UploadedFile() file: Express.Multer.File) {
+    const userId = (req.user as any).id;
+    const companyId = (req.user as any).companyId;
+
+    return this.financialTransactionsService.initiatePaymentRequest({
+      companyId,
+      amount: parseFloat(createContributionDto.amount), // Ensure amount is a number
+      description: createContributionDto.description || 'Contribution',
+      userId,
+      phone: createContributionDto.phone,
+    });
+  }
+
+
+  @Version('2')
+  @Post("payment/callback")
+  async contributioncallback(@Req() req: any) {
+    const contributionData = req.body;
+    console.log(`Received contribution callback with data:`, contributionData);
+    return this.contributionService.processContributionCallback(contributionData);
+  }
+
+
+
 
   @Roles(Role.ADMIN, Role.MEMBER) // Admin can view all, Member can view their own
   @Get('user/:userId')
