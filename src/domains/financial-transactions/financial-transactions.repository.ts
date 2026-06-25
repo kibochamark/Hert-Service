@@ -216,7 +216,7 @@ export class FinancialTransactionsRepository {
              amount:amount,
              phone: phone,
              callback_url: this.config.get('PAYMENT_CALLBACK_URL'),
-            description: JSON.stringify({
+              description: JSON.stringify({
               companyId,
               userId,
               description,

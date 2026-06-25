@@ -1,6 +1,6 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { ContributionRepository } from "./contribution.repository";
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Redis } from 'ioredis';
 import { ConfigService } from "@nestjs/config";
 import { ContributionJobDto } from "src/common/validators/contribution.validators";
@@ -12,137 +12,163 @@ import { PrismaService } from "src/prisma/prisma.service";
 @Injectable()
 export class ContributionProcessor extends WorkerHost{
     private readonly logger = new Logger(ContributionProcessor.name)
-    private readonly publisher: Redis;
 
 
     constructor(private contributionRepo:ContributionRepository,
         private configService:ConfigService,
-        private prisma:PrismaService
+        private prisma:PrismaService,
+        @Inject('REDIS_PUBLISHER')
+        private readonly publisher: Redis,
     ){
         super()
 
-        // Setup a publisher client
-        this.publisher = new Redis({
-            host: this.configService.get("REDIS_HOST"),
-            port: Number(this.configService.get("REDIS_PORT")),
-            password: this.configService.get("REDIS_PASSWORD"),
-        });
+    
     }
 
 
     async process(job: Job<ContributionJobDto, any, string>): Promise<any> {
-        this.logger.log(`Processing contribution job ${job.id} for ${job.data.checkout_request_id}`);
+        this.logger.log(
+            `Processing contribution job ${job.id} for ${job.data.checkout_request_id}`,
+        );
 
         const contData = job.data;
-        let message_payload= {}
-
-        // Construct the channel name using the checkout request id
         const channelName = `contribution:${job.data.checkout_request_id}`;
 
         try {
-            
-            // check job status
-            if(contData.status.toLocaleLowerCase() != "completed"){
-                this.logger.log("Processing failed transaction")
-                // update the transaction in the  tracker table  as failed/cancelled 
-                const transaction =  await this.prisma.transactionsTracker.update({
-                    where:{
-                        checkoutRequestId:contData.checkout_request_id
-                    },
-                    data:{
-                        status:contData.status == "cancelled" ? "CANCELLED" :"FAILED" 
-                    }
-                })
+            // Handle failed/cancelled payments
+            if (contData.status.toLowerCase() !== 'completed') {
+                this.logger.log('Processing failed transaction');
 
-                message_payload["error"] = contData.result_desc
-                message_payload["type"] = "payment_failed"
-                await this.publisher.publish(channelName, JSON.stringify(message_payload));
-                return transaction
+                const transaction = await this.prisma.transactionsTracker.update({
+                    where: {
+                        checkoutRequestId: contData.checkout_request_id,
+                    },
+                    data: {
+                        status:
+                            contData.status.toLowerCase() === 'cancelled'
+                                ? 'CANCELLED'
+                                : 'FAILED',
+                    },
+                });
+
+                await this.publisher.publish(
+                    channelName,
+                    JSON.stringify({
+                        type: 'payment_failed',
+                        error: contData.result_desc,
+                    }),
+                );
+
+                return transaction;
             }
 
+            this.logger.log('Processing completed transaction');
 
-            
-            this.logger.log(`Processsing completed transaction`)
+            const result = await this.prisma.$transaction(
+                async (tx) => {
+                    const userInfo = await tx.transactionsTracker.findUnique({
+                        where: {
+                            checkoutRequestId: contData.checkout_request_id,
+                        },
+                        select: {
+                            metadata: true,
+                            transactionId: true,
+                        },
+                    });
 
-
-            const result= await this.prisma.$transaction(async(tx)=>{
-                // fetch user info for this payment
-                const userinfo = await tx.transactionsTracker.findUnique({
-                    where:{
-                        checkoutRequestId: contData.checkout_request_id
-                    },
-                    select:{
-                        metadata:true,
-                        transactionId:true
+                    if (!userInfo) {
+                        throw new Error(
+                            `Transaction tracker not found for checkout request ${contData.checkout_request_id}`,
+                        );
                     }
-                })
 
-                if(userinfo.metadata){
-                    // create contribution
-                    const created_contribution = await this.contributionRepo.createContribution({
-                        userId:(userinfo.metadata as any)?.userId as string,
-                        companyId: (userinfo.metadata as any)?.companyId as string,
-                        transactionRef:contData.mpesa_receipt_number,
-                        amount:parseFloat(contData.amount.toLocaleString())
-                    })
+                    const metadata = userInfo.metadata as any;
 
+                    if (!metadata?.userId || !metadata?.companyId) {
+                        throw new Error(
+                            `Missing userId or companyId in transaction metadata`,
+                        );
+                    }
 
-                    if(created_contribution){
-                        // approve contribution
-                        const approved= this.contributionRepo.approveContribution(
-                            created_contribution.id,
+                    const createdContribution =
+                        await this.contributionRepo.createContribution(
                             {
-                                processedBy: "automated_processing",
-                                adminNotes:"approved",
-                                approvalStatus:"APPROVED"
-                            }
-                        )
+                                userId: metadata.userId,
+                                companyId: metadata.companyId,
+                                transactionRef: contData.mpesa_receipt_number,
+                                amount: Number(contData.amount),
+                            },
+                            tx,
+                        );
 
-                        if(approved){
-                            await tx.transactionsTracker.update({
-                                where: {
-                                    transactionId: userinfo.transactionId
-                                },
-                                data: {
-                                    status: "COMPLETED"
-                                }
-                            })
-
-                            message_payload["success"] = contData.result_desc
-                            message_payload["type"] = "payment_success"
-                            await this.publisher.publish(channelName, JSON.stringify(message_payload));
-                            return approved
-                        }
-
-                        
-
+                    if (!createdContribution) {
+                        throw new Error('Failed to create contribution');
                     }
-                   
 
+                    const approved =await this.contributionRepo.approveContribution(
+                            createdContribution.id,
+                            {
+                                processedBy: 'automated_processing',
+                                adminNotes: 'approved',
+                                approvalStatus: 'APPROVED',
+                            },
+                            tx,
+                        );
 
-                }
-               
+                    if (!(approved as any)) {
+                        throw new Error('Failed to approve contribution');
+                    }
 
-                return {
-                    success:true,
-                    message:"transactipn completed"
-                }
-            })
+                    await tx.transactionsTracker.update({
+                        where: {
+                            transactionId: userInfo.transactionId,
+                        },
+                        data: {
+                            status: 'COMPLETED',
+                        },
+                    });
 
-            return result
+                    return approved;
+                },
+                {
+                    timeout: 30000, // 30 seconds
+                },
+            );
 
+            // Publish only after transaction commits successfully
+            await this.publisher.publish(
+                channelName,
+                JSON.stringify({
+                    type: 'payment_success',
+                    success: contData.result_desc,
+                }),
+            );
+
+            return result;
         } catch (error: any) {
-            this.logger.error(`Failed to process job ${job.id}: ${error.message}`, error.stack);
-            // Publish failure if necessary
-            const failChannel = `payment:${job.data.checkout_request_id}`;
-            await this.publisher.publish(failChannel, JSON.stringify({
-                type: "payment_failed",
-                error: error.message
-            }));
+            this.logger.error(
+                `Failed to process job ${job.id}: ${error.message}`,
+                error.stack,
+            );
 
-            this.logger.error(`sending failure message`, error.stack);
+            await this.prisma.transactionsTracker.updateMany({
+                where: {
+                    checkoutRequestId: contData.checkout_request_id,
+                },
+                data: {
+                    status: 'FAILED',
+                },
+            });
 
-            throw error;
+            await this.publisher.publish(
+                channelName,
+                JSON.stringify({
+                    type: 'payment_failed',
+                    error: error.message,
+                }),
+            );
+
+            throw error; // BullMQ marks the job as failed and can retry if configured
         }
     }
 

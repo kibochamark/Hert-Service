@@ -24,7 +24,7 @@ export class ContributionService {
     private readonly logger = new Logger(ContributionService.name);
     constructor(private readonly contributionRepository: ContributionRepository,
         private readonly s3Service: S3Service,
-        @InjectQueue('process-contribution') private  processContribution: Queue
+        @InjectQueue('process-contribution-job') private  processContribution: Queue
     ) {}
 
     async createContribution(contributionData: ContributionData, file?: Express.Multer.File) {

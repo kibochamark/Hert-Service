@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { AccountType, ApprovalStatus } from "generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 import { LedgerService } from "../ledger/ledger.service";
+import { Prisma, PrismaClient } from "generated/prisma/client";
 
 
 
@@ -27,9 +28,9 @@ export class ContributionRepository {
   constructor(private readonly prisma: PrismaService, private readonly ledgerService: LedgerService) {}
   
 
-  async createContribution(contributionData: ContributionData) {
+    async createContribution(contributionData: ContributionData, prisma: PrismaClient | Prisma.TransactionClient = this.prisma,) {
     try {
-        const contribution = await this.prisma.$transaction(async(tx)=>{
+        const contribution = await prisma.$transaction(async(tx)=>{
             const contribution = await tx.contributionRequest.create({
                 data: contributionData
             });
@@ -107,9 +108,12 @@ export class ContributionRepository {
       processedBy: string,
     adminNotes?: string
     approvalStatus: ApprovalStatus
-  } ) {
+  },
+    prisma: PrismaClient | Prisma.TransactionClient = this.prisma,
+
+) {
     try {
-        const contribution = await this.prisma.$transaction(async(tx)=>{
+        const contribution = await prisma.$transaction(async(tx)=>{
             // 1. Update the contribution request status to 'PROCESSED'
             const updatedContribution = await tx.contributionRequest.update({
                 where: { id: contributionId },
