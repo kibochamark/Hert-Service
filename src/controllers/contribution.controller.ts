@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Req, UseInterceptors, UploadedFile, Version } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Req, UseInterceptors, UploadedFile, Version, Sse, Inject, MessageEvent } from '@nestjs/common';
 import { ContributionService } from '../domains/contribution/contribution.service';
 import { CreateContributionDto, ApproveContributionDto, UpdateContributionDto, ContributionIdParam, CreateContributionDtoV2 } from '../common/validators/contribution.validators';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -6,11 +6,16 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from 'generated/prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FinancialTransactionsService } from 'src/domains/financial-transactions/financial-transactions.service';
+import Redis from 'ioredis';
+import { filter, fromEvent, map, Observable } from 'rxjs';
 
 @UseGuards(RolesGuard)
 @Controller('contribution')
 export class ContributionController {
-  constructor(private readonly contributionService: ContributionService, private readonly financialTransactionsService: FinancialTransactionsService) {}
+  constructor(private readonly contributionService: ContributionService, private readonly financialTransactionsService: FinancialTransactionsService,
+    @Inject('REDIS_PUBLISHER')
+    private readonly subscriber: Redis
+  ) {}
 
   @Roles(Role.MEMBER, Role.ADMIN) // Members can create their own contributions
   @Post()
@@ -109,4 +114,30 @@ export class ContributionController {
   async getMemberSummary(@Param('companyId') companyId: string) {
     return this.contributionService.getMemberSummaryByCompany(companyId);
   }
+
+  @Sse('payment/event/:checkout-request-id')
+  sse(@Param('checkout-request_id') checkout_request_id: string): Observable < MessageEvent > {
+      const channel = `contribution:${checkout_request_id}`;
+
+      void this.subscriber.subscribe(channel);
+
+      return fromEvent<[string, string]>(
+        this.subscriber,
+        'message',
+      ).pipe(
+        map(([receivedChannel, message]) => {
+          if (receivedChannel !== channel) {
+            return null;
+          }
+
+          return {
+            data: JSON.parse(message),
+          } satisfies MessageEvent;
+        }),
+        filter(
+          (event): event is MessageEvent =>
+            event !== null,
+        ),
+      );
+    }
 }
