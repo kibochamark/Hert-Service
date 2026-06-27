@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Req , Version} from '@nestjs/common';
 import { InvestmentService } from '../domains/investment/investment.service';
 import { CreateInvestmentDto, UpdateInvestmentDto, InvestmentIdParam, UpdateInvestmentStatusDto } from '../common/validators/investment.validators';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -14,6 +14,7 @@ import { Request } from 'express';
 export class InvestmentController {
   constructor(private readonly investmentService: InvestmentService) {}
 
+  @Version('1')
   @Post()
   async createInvestment(@Body() createInvestmentDto: CreateInvestmentDto, @Req() req: Request) {
     const {userId, companyId} = (req.user as any);
@@ -25,6 +26,7 @@ export class InvestmentController {
   }
 
   @UseGuards(RolesGuard)
+  @Version('1')
   @Roles("ADMIN", "MEMBER") // Both ADMIN and MEMBER can view investments
   @Get()
   async findAllInvestments() {
@@ -32,12 +34,14 @@ export class InvestmentController {
     return this.investmentService.findAllInvestments();
   }
 
-  @Roles(Role.ADMIN, Role.MEMBER) // Both ADMIN and MEMBER can view investments
+  @Roles(Role.ADMIN, Role.MEMBER)
+  @Version('1') // Both ADMIN and MEMBER can view investments
   @Get(':investmentId')
   async findInvestmentById(@Param() params: InvestmentIdParam) {
     return this.investmentService.findInvestmentById(params.investmentId);
   }
 
+  @Version('1')
   @Put(':investmentId')
   async updateInvestment(
     @Param() params: InvestmentIdParam,
@@ -50,6 +54,7 @@ export class InvestmentController {
     return this.investmentService.updateInvestment(params.investmentId, data);
   }
 
+  @Version('1')
   @Put(':investmentId/status')
   async updateInvestmentStatus(
     @Param() params: InvestmentIdParam,
@@ -58,6 +63,7 @@ export class InvestmentController {
     return this.investmentService.updateInvestmentStatus(params.investmentId, updateInvestmentStatusDto.status);
   }
 
+  @Version('1')
   @Delete(':investmentId')  
   async deleteInvestment(@Param() params: InvestmentIdParam) {
     return this.investmentService.deleteInvestment(params.investmentId);

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Version } from '@nestjs/common';
 import { FinancialTransactionsService } from '../domains/financial-transactions/financial-transactions.service';
 import { LogRevenueDto, LogExpenseDto, DepositDto } from '../common/validators/financial-transactions.validators';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -12,6 +12,7 @@ import { Request } from 'express';
 export class FinancialTransactionsController {
   constructor(private readonly financialTransactionsService: FinancialTransactionsService) {}
 
+  @Version('1')
   @Post('revenue')
   async logRevenue(@Body() logRevenueDto: LogRevenueDto, @Req() req: Request) {
     const companyId = (req.user as any).companyId;
@@ -26,6 +27,7 @@ export class FinancialTransactionsController {
     );
   }
 
+  @Version('1')
   @Post('expense')
   async logExpense(@Body() logExpenseDto: LogExpenseDto, @Req() req: Request) {
     const companyId = (req.user as any).companyId;
@@ -40,18 +42,21 @@ export class FinancialTransactionsController {
     );
   }
 
+  @Version('1')
   @Get('revenue')
   async getRevenue(@Req() req: Request) {
     const companyId = (req.user as any).companyId;
     return this.financialTransactionsService.getRevenue(companyId);
   }
 
+  @Version('1')
   @Get('expenses')
   async getExpenses(@Req() req: Request) {
     const companyId = (req.user as any).companyId;
     return this.financialTransactionsService.getExpenses(companyId);
   }
 
+  @Version('1')
   @Post('deposit')
   async deposit(@Body() depositDto: DepositDto, @Req() req: Request) {
     const companyId = (req.user as any).companyId;
@@ -59,6 +64,7 @@ export class FinancialTransactionsController {
     return this.financialTransactionsService.deposit(depositDto, companyId, userId);
   }
 
+  @Version('1')
   @Get('balance')
   async getCompanyBalance(@Req() req: Request) {
     const companyId = (req.user as any).companyId;

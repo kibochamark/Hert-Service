@@ -18,6 +18,7 @@ export class ContributionController {
   ) {}
 
   @Roles(Role.MEMBER, Role.ADMIN) // Members can create their own contributions
+  @Version('1')
   @Post()
   @UseInterceptors(FileInterceptor('evidence'))
   async createContribution(@Body() createContributionDto: CreateContributionDto, @Req() req: any, @UploadedFile() file: Express.Multer.File) {
@@ -62,25 +63,29 @@ export class ContributionController {
 
 
 
-  @Roles(Role.ADMIN, Role.MEMBER) // Admin can view all, Member can view their own
+  @Roles(Role.ADMIN, Role.MEMBER)
+  @Version('1') // Admin can view all, Member can view their own
   @Get('user/:userId')
   async findContributionsByUser(@Param('userId') userId: string) {
     return this.contributionService.findContributionsByUser(userId);
   }
 
   @Roles(Role.ADMIN) // Only Admin can view contributions by company
+  @Version('1')
   @Get('company/:companyId')
   async findContributionsByCompany(@Param('companyId') companyId: string) {
     return this.contributionService.findContributionsByCompany(companyId);
   }
 
   @Roles(Role.ADMIN, Role.MEMBER) // Admin can view any, Member can view their own
+  @Version('1')
   @Get(':contributionId')
   async getContributionById(@Param() params: ContributionIdParam) {
     return this.contributionService.getContributionById(params.contributionId);
   }
 
   @Roles(Role.ADMIN) // Only Admin can approve/reject contributions
+  @Version('1')
   @Put(':contributionId/approve')
   async approveContribution(
     @Param() params: ContributionIdParam,
@@ -95,6 +100,7 @@ export class ContributionController {
   }
 
   @Roles(Role.ADMIN, Role.MEMBER) // Admin can update any, Member can update their own (if PENDING)
+  @Version('1')
   @Put(':contributionId')
   async updateContribution(
     @Param() params: ContributionIdParam,
@@ -104,12 +110,14 @@ export class ContributionController {
   }
 
   @Roles(Role.ADMIN, Role.MEMBER) // Only Admin can delete contributions
+  @Version('1')
   @Delete(':contributionId')
   async deleteContribution(@Param() params: ContributionIdParam) {
     return this.contributionService.deleteContribution(params.contributionId);
   }
 
   @Roles(Role.ADMIN)
+  @Version('1')
   @Get('company/:companyId/member-summary')
   async getMemberSummary(@Param('companyId') companyId: string) {
     return this.contributionService.getMemberSummaryByCompany(companyId);

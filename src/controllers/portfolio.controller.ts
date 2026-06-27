@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req, Version } from '@nestjs/common';
 import { FinancialTransactionsService } from '../domains/financial-transactions/financial-transactions.service';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -11,6 +11,7 @@ import { Request } from 'express';
 export class PortfolioController {
   constructor(private readonly financialTransactionsService: FinancialTransactionsService) {}
 
+  @Version('1')
   @Get('summary')
   async getPortfolioSummary(@Req() req: Request) {
     const companyId = (req.user as any).companyId;
