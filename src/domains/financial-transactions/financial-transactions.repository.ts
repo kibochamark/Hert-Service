@@ -224,6 +224,9 @@ export class FinancialTransactionsRepository {
             }),
         }).then(res => res.json());
 
+
+        this.logger.log(paymentRequest)
+
         // console.log(`Payment provider response:`, paymentRequest);
 
 
