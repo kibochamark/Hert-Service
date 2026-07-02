@@ -47,7 +47,9 @@ export class ContributionProcessor extends WorkerHost{
                         status:
                             contData.status.toLowerCase() === 'cancelled'
                                 ? 'CANCELLED'
-                                : 'FAILED',
+                                : contData.status.toLowerCase() === 'completed'
+                                    ? 'COMPLETED'
+                                    : 'FAILED',
                     },
                 });
 
@@ -100,6 +102,8 @@ export class ContributionProcessor extends WorkerHost{
                             },
                             tx,
                         );
+                    
+                    this.logger.log(`Created contribution with ID: ${createdContribution.id} for user: ${metadata.userId} in company: ${metadata.companyId}`);
 
                     if (!createdContribution) {
                         throw new Error('Failed to create contribution');
@@ -116,7 +120,7 @@ export class ContributionProcessor extends WorkerHost{
                         );
 
                     if (!(approved as any)) {
-                        throw new Error('Failed to approve contribution');
+                        throw new Error(`Failed to approve contribution:${approved}`);
                     }
 
                     await tx.transactionsTracker.update({

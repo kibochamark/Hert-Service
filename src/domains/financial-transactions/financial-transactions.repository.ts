@@ -227,7 +227,7 @@ export class FinancialTransactionsRepository {
 
         this.logger.log(paymentRequest)
 
-        // console.log(`Payment provider response:`, paymentRequest);
+        console.log(`Payment provider response:`, paymentRequest);
 
 
 
@@ -235,7 +235,7 @@ export class FinancialTransactionsRepository {
           throw new Error('Failed to initiate payment request with payment provider');
         }
 
-        await tx.transactionsTracker.create({
+        const tracker = await tx.transactionsTracker.create({
           data: {
             transactionId:`${userId}-${amount}-${Date.now()}`,
             checkoutRequestId: paymentRequest?.data?.checkout_request_id,
@@ -249,6 +249,8 @@ export class FinancialTransactionsRepository {
             }
           },
         });
+
+        this.logger.log(`Payment request tracker created with ID: ${tracker.id} for user: ${userId}`);
 
         
 

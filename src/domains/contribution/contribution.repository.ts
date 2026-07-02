@@ -175,6 +175,8 @@ export class ContributionRepository {
             }
            
 
+            return updatedContribution;
+
             
         })
 
