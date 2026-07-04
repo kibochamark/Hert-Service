@@ -13,6 +13,14 @@ async function bootstrap() {
     type: VersioningType.URI,
     prefix: 'api/v',
   });
+  app.enableCors({
+    origin: [
+      'http://localhost:3000',
+      'https://hertventures.com',
+      'https://www.hertventures.com',
+    ],
+    credentials: true,
+  });
   await app.listen(process.env.PORT ?? 4000);
 }
 bootstrap();

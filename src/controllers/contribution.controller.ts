@@ -123,8 +123,9 @@ export class ContributionController {
     return this.contributionService.getMemberSummaryByCompany(companyId);
   }
 
-  @Sse('payment/event/:checkout-request-id')
-  sse(@Param('checkout-request_id') checkout_request_id: string): Observable < MessageEvent > {
+  @Sse('payment/event/:checkoutrequestid')
+  @Version('1')
+  sse(@Param('checkoutrequestid') checkout_request_id: string): Observable < MessageEvent > {
       const channel = `contribution:${checkout_request_id}`;
 
       void this.subscriber.subscribe(channel);
