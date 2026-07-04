@@ -32,6 +32,7 @@ export class ContributionProcessor extends WorkerHost{
         );
 
         const contData = job.data;
+        this.logger.log(`Contribution data: ${JSON.stringify(contData)}`);
         const channelName = `contribution:${job.data.checkout_request_id}`;
 
         try {
