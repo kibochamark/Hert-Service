@@ -9,12 +9,12 @@ import { Request } from 'express';
 
 // All routes in this controller require ADMIN role
 @UseGuards(RolesGuard) 
-@Roles(`ADMIN`, `MEMBER`) // Both ADMIN and MEMBER can access investment routes
 @Controller('investment')
 export class InvestmentController {
   constructor(private readonly investmentService: InvestmentService) {}
 
-  @Version('1')
+  
+  @Roles(`ADMIN`) // Both ADMIN and MEMBER can access investment routes
   @Post()
   async createInvestment(@Body() createInvestmentDto: CreateInvestmentDto, @Req() req: Request) {
     const {userId, companyId} = (req.user as any);
@@ -24,10 +24,9 @@ export class InvestmentController {
       company: { connect: { id: companyId } }, // Connect to company
     }, userId);
   }
-
-  @UseGuards(RolesGuard)
-  @Version('1')
+  
   @Roles("ADMIN", "MEMBER") // Both ADMIN and MEMBER can view investments
+  @Version('1')
   @Get()
   async findAllInvestments() {
     console.log("Fetching all investments");
@@ -35,7 +34,6 @@ export class InvestmentController {
   }
 
   @Roles(Role.ADMIN, Role.MEMBER)
-  @Version('1') // Both ADMIN and MEMBER can view investments
   @Get(':investmentId')
   async findInvestmentById(@Param() params: InvestmentIdParam) {
     return this.investmentService.findInvestmentById(params.investmentId);
@@ -54,7 +52,7 @@ export class InvestmentController {
     return this.investmentService.updateInvestment(params.investmentId, data);
   }
 
-  @Version('1')
+
   @Put(':investmentId/status')
   async updateInvestmentStatus(
     @Param() params: InvestmentIdParam,
@@ -63,7 +61,7 @@ export class InvestmentController {
     return this.investmentService.updateInvestmentStatus(params.investmentId, updateInvestmentStatusDto.status);
   }
 
-  @Version('1')
+
   @Delete(':investmentId')  
   async deleteInvestment(@Param() params: InvestmentIdParam) {
     return this.investmentService.deleteInvestment(params.investmentId);
