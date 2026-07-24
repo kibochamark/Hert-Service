@@ -228,4 +228,10 @@ export class FinancialTransactionsService {
   ) {
     return this.financialTransactionsRepository.initiatePaymentRequest(paymentinfo.companyId, paymentinfo.amount, paymentinfo.description, paymentinfo.userId, paymentinfo.phone);
   }
+
+
+
+  async getPaymentStatus(checkout_request_id: string) {
+    return this.financialTransactionsRepository.getPaymentStatus(checkout_request_id);
+  }
 }

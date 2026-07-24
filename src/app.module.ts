@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { CompanyModule } from './domains/company/company.module';
 import { S3Module } from './globalservices/s3/s3.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './domains/users/users.module';
 import { ContributionModule } from './domains/contribution/contribution.module';
@@ -9,6 +10,7 @@ import { InvestmentModule } from './domains/investment/investment.module';
 import { FinancialTransactionsModule } from './domains/financial-transactions/financial-transactions.module';
 import { BullModule } from '@nestjs/bullmq';
 import { JOB_NAMES, QUEUE_NAMES } from './lib/constants';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -29,6 +31,26 @@ import { JOB_NAMES, QUEUE_NAMES } from './lib/constants';
         removeOnFail: 2000,
       },
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,      // 1 second
+        limit: 10,
+      },
+      {
+        name: 'medium',
+        ttl: 60000,     // 1 minute
+        limit: 100,
+      },
+      {
+        name: 'long',
+        ttl: 3600000,   // 1 hour
+        limit: 1000,
+      },
+    ]),
+
+    
+
     PrismaModule,
     CompanyModule,
     S3Module,
@@ -36,6 +58,12 @@ import { JOB_NAMES, QUEUE_NAMES } from './lib/constants';
     ContributionModule,
     InvestmentModule,
     FinancialTransactionsModule
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard
+    },  
   ],
 })
 export class AppModule {}

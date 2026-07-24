@@ -8,6 +8,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { FinancialTransactionsService } from 'src/domains/financial-transactions/financial-transactions.service';
 import Redis from 'ioredis';
 import { filter, fromEvent, map, Observable } from 'rxjs';
+import { get } from 'node:http';
+import { Throttle } from '@nestjs/throttler';
 
 @UseGuards(RolesGuard)
 @Controller('contribution')
@@ -37,6 +39,7 @@ export class ContributionController {
 
   @Roles(Role.MEMBER, Role.ADMIN) // Members can create their own contributions
   @Version('2')
+  @Throttle({ short: { limit: 2, ttl: 60000 } })
   @Post()
   async createContributionV2(@Body() createContributionDto: CreateContributionDtoV2, @Req() req: any, @UploadedFile() file: Express.Multer.File) {
     const userId = (req.user as any).id;
@@ -149,4 +152,11 @@ export class ContributionController {
         ),
       );
     }
+
+  @Throttle({ short: { limit: 30, ttl: 60000 } })
+  @Get('payment/status/:checkoutrequestid')
+  @Version('1')
+  async getPaymentStatus(@Param('checkoutrequestid') checkout_request_id: string) {
+    return this.financialTransactionsService.getPaymentStatus(checkout_request_id);
+  }
 }

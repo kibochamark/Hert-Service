@@ -265,4 +265,37 @@ export class FinancialTransactionsRepository {
       throw error;
     }
   }
+
+
+  async getPaymentStatus(checkout_request_id: string): Promise<{data: any, status: string}> {
+    try {
+      this.logger.log(`Fetching payment status for checkout request ID: ${checkout_request_id}`);
+
+      // Check if our transactioin tracker has this checkout_request_id
+      const tracker = await this.prisma.transactionsTracker.findUnique({
+        where: { checkoutRequestId: checkout_request_id },
+      });
+
+      if (!tracker) {
+        throw new Error(`No transaction tracker found for checkout request ID: ${checkout_request_id}`);
+      }
+
+      if (tracker.status === 'COMPLETED') {
+        this.logger.log(`Payment already completed for checkout request ID: ${checkout_request_id}`);
+        return { data: tracker.metadata, status: 'COMPLETED' };
+      }
+
+      if (tracker.status === 'FAILED') {
+        this.logger.log(`Payment already failed for checkout request ID: ${checkout_request_id}`);
+        return { data: tracker.metadata, status: 'FAILED' };
+      }
+
+      return { data: tracker.metadata, status: tracker.status };
+
+
+    } catch (error) {
+      this.logger.error(`Error fetching payment status for checkout request ID: ${checkout_request_id}`, error);
+      throw error;
+    }
+  }
 }
