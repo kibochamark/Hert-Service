@@ -8,7 +8,7 @@ interface LedgerTransactionDto {
     creditAccountId: string;
     amount: number;
     description: string;
-    userId: string;
+    userId?: string;
     companyId: string;
     referenceId?: string;
     metadata?: any;

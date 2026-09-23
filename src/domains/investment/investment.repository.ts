@@ -199,7 +199,6 @@ export class InvestmentRepository {
             creditAccountId: investmentAccount.id,
             amount: investment.principal.toNumber(),
             description: `Reversing capital for deleted investment: ${investment.name}`,
-            userId: 'system', // System user for reversals
             companyId: investment.companyId,
             referenceId: investment.id,
           });
